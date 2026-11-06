@@ -10,4 +10,4 @@ Each `*.json` holds one case:
 ```
 
 Keys in vectors are test-only (generated deterministically from a fixed seed, never used in production).
-Positive vectors must reproduce byte-for-byte on 3.11 / 3.12 / 3.14.
+Positive vectors must reproduce byte-for-byte on 3.11 / 3.12 / 3.13 / 3.14.
