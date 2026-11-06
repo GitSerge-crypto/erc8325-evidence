@@ -9,7 +9,7 @@ description = "AOT-EV1 — deterministic evidence layer for the ERC-8325 evidenc
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
-authors = [{name = "Sahei", email = "legal@aotrust.link"}]
+authors = [{name = "AOTrust", email = "legal@aotrust.link"}]
 keywords = ["evidence", "attestation", "erc-8325", "jcs", "ed25519", "provenance"]
 dependencies = ["pynacl>=1.5"]
 

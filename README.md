@@ -12,4 +12,4 @@ Core is independent of any service; anchoring is an optional extra (`[anchor]`).
 
 Status: **v0.1 in development**. Contract: [SPEC.md](SPEC.md).
 
-License: Apache-2.0. Maintainer: Sahei (legal@aotrust.link).
+License: Apache-2.0. Maintained by the AOTrust project (legal@aotrust.link).
