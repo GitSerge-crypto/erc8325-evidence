@@ -135,3 +135,10 @@ def test_inspect_bundle(tmp_path, capsys):
     assert "evidence_hash:" in out
     assert "signatures/issuer.ed25519" in out
     assert '"v": "1"' in out
+
+
+def test_inspect_bad_bundle(tmp_path, capsys):
+    path = tmp_path / "bad.zip"
+    path.write_bytes(b"not a zip")
+    assert cli.main(["inspect", str(path)]) == 2
+    assert "cannot inspect bundle" in capsys.readouterr().err

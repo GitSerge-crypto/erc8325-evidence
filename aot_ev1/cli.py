@@ -91,10 +91,13 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     from .bundle import MANIFEST_NAME, PAYLOAD_NAME
     from .canonical import parse_json
 
-    with zipfile.ZipFile(args.path) as archive:
-        manifest = parse_json(archive.read(MANIFEST_NAME))
-        payload_bytes = archive.read(PAYLOAD_NAME)
-    payload = parse_json(payload_bytes)
+    try:
+        with zipfile.ZipFile(args.path) as archive:
+            manifest = parse_json(archive.read(MANIFEST_NAME))
+            payload_bytes = archive.read(PAYLOAD_NAME)
+        payload = parse_json(payload_bytes)
+    except (zipfile.BadZipFile, KeyError, OSError) as exc:
+        raise AOTEV1Error(f"cannot inspect bundle: {exc}") from exc
     sys.stdout.write(f"evidence_hash: {manifest['evidence_hash']}\n")
     sys.stdout.write(f"created_at: {manifest['created_at']}\n")
     sys.stdout.write(f"bundle_hash: {manifest['bundle_hash']}\n")
@@ -132,6 +135,8 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         state = "ok" if step.ok else (step.error or "failed")
         sys.stdout.write(f"step {step.number:2d}: {state:<14} {step.name}\n")
     sys.stdout.write(f"status: {result.status}\n")
+    if result.bundle_sha256:
+        sys.stdout.write(f"bundle_sha256: {result.bundle_sha256}\n")
     if result.evidence_hash:
         sys.stdout.write(f"evidence_hash: {result.evidence_hash}\n")
     sys.stdout.write(f"chain: {result.chain}\n")
@@ -144,6 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aotev",
         description="AOT-EV1 — deterministic evidence layer for ERC-8325.",
+        epilog="Exit codes: 0 valid, 2 broken (steps 1-10), 3 expired/revoked, 4 chain error.",
     )
     parser.add_argument("--version", action="version", version=f"aot-ev1 {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
