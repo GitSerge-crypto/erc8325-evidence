@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aot-ev1"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "AOT-EV1 — deterministic evidence layer for the ERC-8325 evidenceHash slot"
 readme = "README.md"
 requires-python = ">=3.11"
