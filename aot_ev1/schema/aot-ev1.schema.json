@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aotrust.link/schema/aot-ev1.schema.json",
+  "title": "AOT-EV1 payload v1",
+  "description": "Signed evidence payload of the AOT-EV1 format (SPEC.md §2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "issuer",
+    "auditor",
+    "subject",
+    "claims",
+    "valid_from",
+    "valid_until",
+    "nonce",
+    "prev_evidence_hash",
+    "revocation"
+  ],
+  "properties": {
+    "v": { "const": "1" },
+    "issuer": { "$ref": "#/$defs/identity" },
+    "auditor": {
+      "oneOf": [{ "$ref": "#/$defs/identity" }, { "type": "null" }]
+    },
+    "subject": { "$ref": "#/$defs/subject" },
+    "claims": { "type": "object" },
+    "valid_from": { "type": "integer", "minimum": 0 },
+    "valid_until": {
+      "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+    },
+    "nonce": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "prev_evidence_hash": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "revocation": {
+      "oneOf": [{ "$ref": "#/$defs/revocation" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "oneOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "identity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "key_id", "display"],
+          "properties": {
+            "scheme": { "const": "ed25519" },
+            "key_id": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "display": { "$ref": "#/$defs/nullableString" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "key_id", "display"],
+          "properties": {
+            "scheme": { "const": "eip712" },
+            "key_id": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+            "display": { "$ref": "#/$defs/nullableString" }
+          }
+        }
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "hash_alg", "hash", "uri"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "hash_alg": { "const": "sha256" },
+        "hash": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "uri": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revoked_at", "reason"],
+      "properties": {
+        "revoked_at": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
