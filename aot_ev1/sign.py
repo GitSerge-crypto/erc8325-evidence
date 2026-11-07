@@ -19,6 +19,7 @@ __all__ = [
     "ISSUER_DOMAIN",
     "AUDITOR_DOMAIN",
     "ROLES",
+    "EVM_EXTRA_HINT",
     "signing_message",
     "ed25519_public_key",
     "ed25519_key_id",
@@ -170,13 +171,24 @@ def eip712_typed_data(payload: dict[str, Any], chain_id: int) -> dict[str, Any]:
     }
 
 
+EVM_EXTRA_HINT = (
+    "EIP-712 support requires the optional dependency: pip install 'aot-ev1[evm]'"
+)
+
+
+def _eip712_encoder() -> Any:
+    try:
+        from eth_account.messages import encode_typed_data
+    except ImportError as exc:
+        raise ImportError(EVM_EXTRA_HINT) from exc
+    return encode_typed_data
+
+
 def _evm() -> Any:
     try:
         from eth_account import Account
-    except ImportError as exc:  # pragma: no cover - depends on extra install
-        raise ImportError(
-            "EIP-712 support requires the optional dependency: pip install 'aot-ev1[evm]'"
-        ) from exc
+    except ImportError as exc:
+        raise ImportError(EVM_EXTRA_HINT) from exc
     return Account
 
 
@@ -200,7 +212,7 @@ def sign_eip712(private_key: str | bytes, payload: dict[str, Any], chain_id: int
 
 
 def recover_eip712(signature: bytes, payload: dict[str, Any], chain_id: int) -> str:
-    from eth_account.messages import encode_typed_data
+    encode_typed_data = _eip712_encoder()
 
     Account = _evm()
     if len(signature) != 65:
