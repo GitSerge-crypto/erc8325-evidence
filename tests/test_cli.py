@@ -3,7 +3,9 @@
 import pytest
 
 from aot_ev1 import cli
+from aot_ev1.bundle import bundle_bytes
 from aot_ev1.canonical import canonical_bytes, evidence_hash_hex
+from aot_ev1.sign import sign_evidence
 from aot_ev1.sign import eip712_key_id
 
 from helpers import (
@@ -95,3 +97,41 @@ def test_sign_command_eip712(tmp_path):
     assert cli.main(["sign", "--payload", str(path), "--issuer-key", EVM_SEED, "--out", str(out)]) == 0
     assert len((out / "signatures" / "issuer.eip712").read_bytes()) == 65
     assert eip712_key_id(EVM_SEED) == EVM_ISSUER_ADDRESS
+
+
+def make_bundle(tmp_path, payload, name="bundle.aotev.zip"):
+    signature = sign_evidence(payload, "issuer", ISSUER_SEED)
+    path = tmp_path / name
+    path.write_bytes(bundle_bytes(payload, {"issuer": signature}, created_at=1_700_000_000))
+    return path
+
+
+def test_verify_command_exit_codes(tmp_path, capsys):
+    path = make_bundle(tmp_path, valid_payload())
+    assert cli.main(["verify", str(path), "--now", "1750000000"]) == 0
+    assert "status: valid" in capsys.readouterr().out
+    assert cli.main(["verify", str(path), "--now", "1800000001"]) == 3
+    assert "status: expired" in capsys.readouterr().out
+    broken = tmp_path / "broken.zip"
+    broken.write_bytes(b"not a zip")
+    assert cli.main(["verify", str(broken), "--now", "1750000000"]) == 2
+    assert "E_BUNDLE_NOT_ZIP" in capsys.readouterr().out
+
+
+def test_verify_command_chain_exit_code(tmp_path, capsys):
+    previous = make_bundle(tmp_path, valid_payload(), "previous.aotev.zip")
+    chained = payload_copy(prev_evidence_hash="ab" * 32, valid_until=None)
+    current = make_bundle(tmp_path, chained, "current.aotev.zip")
+    assert cli.main(["verify", str(current), "--chain", str(previous), "--now", "1750000000"]) == 4
+    out = capsys.readouterr().out
+    assert "chain: unverified" in out
+    assert "E_CHAIN" in out
+
+
+def test_inspect_bundle(tmp_path, capsys):
+    path = make_bundle(tmp_path, valid_payload())
+    assert cli.main(["inspect", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "evidence_hash:" in out
+    assert "signatures/issuer.ed25519" in out
+    assert '"v": "1"' in out

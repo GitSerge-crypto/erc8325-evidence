@@ -11,6 +11,7 @@ from . import __version__
 from .canonical import canonical_bytes, evidence_hash_hex, parse_payload
 from .errors import AOTEV1Error, exit_code_for
 from .bundle import read_signed_dir, write_bundle
+from .verify import verify_bundle
 from .schema_lite import validate_payload
 from .sign import eip712_types, sign_evidence
 
@@ -65,9 +66,7 @@ def _cmd_sign(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_inspect(args: argparse.Namespace) -> int:
-    if not args.types:
-        raise AOTEV1Error("inspect needs --types (bundle inspection is not implemented yet)")
+def _print_types() -> None:
     from .sign import PAYLOAD_FIELDS
 
     sys.stdout.write("payload fields:\n")
@@ -77,6 +76,38 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     for type_name, fields in eip712_types().items():
         rendered = ", ".join(f"{item['name']} {item['type']}" for item in fields)
         sys.stdout.write(f"  {type_name}({rendered})\n")
+
+
+def _cmd_inspect(args: argparse.Namespace) -> int:
+    if args.types:
+        _print_types()
+        if not args.path:
+            return 0
+    if not args.path:
+        raise AOTEV1Error("inspect needs a bundle path or --types")
+    import json
+    import zipfile
+
+    from .bundle import MANIFEST_NAME, PAYLOAD_NAME
+    from .canonical import parse_json
+
+    with zipfile.ZipFile(args.path) as archive:
+        manifest = parse_json(archive.read(MANIFEST_NAME))
+        payload_bytes = archive.read(PAYLOAD_NAME)
+    payload = parse_json(payload_bytes)
+    sys.stdout.write(f"evidence_hash: {manifest['evidence_hash']}\n")
+    sys.stdout.write(f"created_at: {manifest['created_at']}\n")
+    sys.stdout.write(f"bundle_hash: {manifest['bundle_hash']}\n")
+    sys.stdout.write("entries:\n")
+    for entry in manifest["entries"]:
+        sys.stdout.write(f"  {entry['name']} {entry['size']} {entry['sha256']}\n")
+    sys.stdout.write("signatures:\n")
+    for signature in manifest["signatures"]:
+        sys.stdout.write(
+            f"  {signature['role']} {signature['scheme']} {signature['key_id']} {signature['file']}\n"
+        )
+    sys.stdout.write("payload:\n")
+    sys.stdout.write(json.dumps(payload, indent=2, ensure_ascii=True, sort_keys=True) + "\n")
     return 0
 
 
@@ -88,6 +119,25 @@ def _cmd_bundle(args: argparse.Namespace) -> int:
     sys.stdout.write(f"evidence_hash: {evidence_hash_hex(payload)}\n")
     sys.stdout.write(f"bundle_sha256: {digest}\n")
     return 0
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    result = verify_bundle(
+        args.bundle,
+        now=args.now,
+        chain_path=args.chain,
+        chain_id=args.chain_id,
+    )
+    for step in result.steps:
+        state = "ok" if step.ok else (step.error or "failed")
+        sys.stdout.write(f"step {step.number:2d}: {state:<14} {step.name}\n")
+    sys.stdout.write(f"status: {result.status}\n")
+    if result.evidence_hash:
+        sys.stdout.write(f"evidence_hash: {result.evidence_hash}\n")
+    sys.stdout.write(f"chain: {result.chain}\n")
+    if result.error is not None:
+        sys.stdout.write(f"error: {result.error}\n")
+    return result.exit_code
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -120,6 +170,13 @@ def build_parser() -> argparse.ArgumentParser:
     bundle.add_argument("-o", "--out", help="output zip path (default: <evidence_hash>.aotev.zip)")
     bundle.add_argument("--created-at", type=int, help="manifest created_at (default: payload.valid_from)")
     bundle.set_defaults(func=_cmd_bundle)
+
+    verify = sub.add_parser("verify", help="verify a bundle offline (12 checks)")
+    verify.add_argument("bundle", help="bundle file")
+    verify.add_argument("--chain", help="previous bundle for chain continuity (optional)")
+    verify.add_argument("--now", type=int, help="verification time in unix seconds (default: system clock)")
+    verify.add_argument("--chain-id", type=int, default=1, help="EIP-712 chainId (default: 1)")
+    verify.set_defaults(func=_cmd_verify)
     return parser
 
 
