@@ -1,0 +1,46 @@
+{
+  "name": "negative_issuer_key",
+  "note": "issuer signature made by the auditor key",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1313131313131313131313131313131313131313131313131313131313131313",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "wrong_key",
+  "expect": {
+    "evidence_hash": "89c1e2d7861682496cb0ac5bd85638a2f23f2fcad9ce905c8067501b7a5f9051",
+    "canonical_bytes_sha256": "d29dcb4c0e17c21b04a9f343e0678f0f3fe4173a76255a7cebb3bebb049aa11a",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_SIGNATURE",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

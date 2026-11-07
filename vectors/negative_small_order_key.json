@@ -1,0 +1,46 @@
+{
+  "name": "negative_small_order_key",
+  "note": "issuer key_id is the all-zero small-order point",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "0000000000000000000000000000000000000000000000000000000000000000",
+      "display": null
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1515151515151515151515151515151515151515151515151515151515151515",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "small_order",
+  "expect": {
+    "evidence_hash": "29394d75601e29180e2b8a3b6d864209a0b62d34b4a446f320ed061ac34319c5",
+    "canonical_bytes_sha256": "7617cb321db51b974338a904e62f69058208290d4959ea0eb441c8ac7a90b28c",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_SIGNATURE",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

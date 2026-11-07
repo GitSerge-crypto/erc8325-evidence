@@ -1,0 +1,46 @@
+{
+  "name": "negative_evidence_hash",
+  "note": "manifest evidence_hash replaced",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1212121212121212121212121212121212121212121212121212121212121212",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "evidence_hash",
+  "expect": {
+    "evidence_hash": "ed18b5fde2931843902f4788e54192cb2e8fd3e56d42f7e3000d7df627d864d6",
+    "canonical_bytes_sha256": "02762cd6439aa8b84e40056c50342a8353f2cb3c5bbf5e010f5947fb25e5e2e0",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_EVIDENCE_HASH",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "negative_expired",
+  "note": "verification time is past valid_until",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "2222222222222222222222222222222222222222222222222222222222222222",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1800000001,
+  "chain": null,
+  "mutate": "none",
+  "expect": {
+    "evidence_hash": "701e233089e028568ccb0f76b4d7be58c60762664e386d90811837aa38b80ecd",
+    "canonical_bytes_sha256": "515ee9a2c603b8ee4a79e9f8839f7790940749fea93da54daba924189ecfe662",
+    "bundle_sha256": null,
+    "verdict": "expired",
+    "error": "E_EXPIRED",
+    "exit_code": 3,
+    "chain": "unverified"
+  }
+}

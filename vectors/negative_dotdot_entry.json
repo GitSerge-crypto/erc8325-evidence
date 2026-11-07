@@ -1,0 +1,46 @@
+{
+  "name": "negative_dotdot_entry",
+  "note": "zip contains a ../ entry",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1919191919191919191919191919191919191919191919191919191919191919",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "dotdot_entry",
+  "expect": {
+    "evidence_hash": "c09505eddda512485d69ce4dd2d64058923a4aa989042871b5caed0e6f8f4d1a",
+    "canonical_bytes_sha256": "9c9bc1c63447beda5e50897522debc2366aa2131b1fb406df5457b3a0578ddd0",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_ENTRY_NAME",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

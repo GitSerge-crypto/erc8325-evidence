@@ -1,0 +1,49 @@
+{
+  "name": "negative_revoked",
+  "note": "payload carries a revocation record",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "2323232323232323232323232323232323232323232323232323232323232323",
+    "prev_evidence_hash": null,
+    "revocation": {
+      "revoked_at": 1710000000,
+      "reason": "key compromise"
+    }
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "none",
+  "expect": {
+    "evidence_hash": "b5e335fbb76754993e320f694bac65f4a3c6c9785e951d090a7de945246b1e6e",
+    "canonical_bytes_sha256": "b509f9db995f248ba241e5a48d082b23487ec54b3accfdf18b25fab9c385f1be",
+    "bundle_sha256": null,
+    "verdict": "revoked",
+    "error": "E_REVOKED",
+    "exit_code": 3,
+    "chain": "unverified"
+  }
+}

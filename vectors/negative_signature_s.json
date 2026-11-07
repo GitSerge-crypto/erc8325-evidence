@@ -1,0 +1,46 @@
+{
+  "name": "negative_signature_s",
+  "note": "Ed25519 signature with S = L (non-canonical scalar)",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1414141414141414141414141414141414141414141414141414141414141414",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "sig_s",
+  "expect": {
+    "evidence_hash": "b5b4c436d34f44761ec17240ff0c6022679de325a048aeede6f923d68ed063f4",
+    "canonical_bytes_sha256": "9d3215b6a4e970b53b04d0e419b819dd9ca0db734874884ad2c626b6c92783ba",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_SIGNATURE",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

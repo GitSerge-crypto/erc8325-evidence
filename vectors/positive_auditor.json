@@ -1,0 +1,50 @@
+{
+  "name": "positive_auditor",
+  "note": "issuer and auditor Ed25519, different keys",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": {
+      "scheme": "ed25519",
+      "key_id": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+      "display": "AOTrust test auditor"
+    },
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "auditor",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "0303030303030303030303030303030303030303030303030303030303030303",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "none",
+  "expect": {
+    "evidence_hash": "db142e0551047b85c392f3f82ef78394af6cf8317e56cef74c33639e4a94eacc",
+    "canonical_bytes_sha256": "24d11c94086b941c4a6eee83dc4961e8b46932d824bd1a5e470c6df5fbfdc86d",
+    "bundle_sha256": "ae00d6e6725d186191423822b2c560233842ca708f8ac8f93bb1b3715822d298",
+    "verdict": "valid",
+    "error": null,
+    "exit_code": 0,
+    "chain": "unverified"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "negative_tampered_payload",
+  "note": "one byte of payload.json flipped after signing",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1111111111111111111111111111111111111111111111111111111111111111",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "tamper_payload",
+  "expect": {
+    "evidence_hash": "17c5a05f413b7d34a8280ab39044d71ad545e50f6cc3fd5aacc4b19c76a24bbb",
+    "canonical_bytes_sha256": "f716f2940bacb7319f8945737dd90f6c2f2cad53c93e3c8241b1728f28abd316",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_BUNDLE_HASH",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}

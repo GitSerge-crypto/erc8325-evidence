@@ -1,0 +1,46 @@
+{
+  "name": "positive_eip712",
+  "note": "issuer EIP-712 on chainId 1, no verifyingContract",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "eip712",
+      "key_id": "0x5CbDd86a2FA8Dc4bDdd8a8f69dBa48572EeC07FB",
+      "display": null
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "eip712",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "0202020202020202020202020202020202020202020202020202020202020202",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "0x3333333333333333333333333333333333333333333333333333333333333333",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "none",
+  "expect": {
+    "evidence_hash": "10664e253a85480626815f86399fd9843173118a1bb691a1e301c97ea2ef157b",
+    "canonical_bytes_sha256": "c1005678bddd6ba42cbaf526f3124fbabc416ee8353a1d77db5790e8f04cccec",
+    "bundle_sha256": "19a37b41c4045026ce4e945ce1de000135ea043da7d41257c2cc812b38638ab4",
+    "verdict": "valid",
+    "error": null,
+    "exit_code": 0,
+    "chain": "unverified"
+  }
+}

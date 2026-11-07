@@ -1,0 +1,46 @@
+{
+  "name": "negative_duplicate_entry",
+  "note": "payload.json appears twice in the zip",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "1818181818181818181818181818181818181818181818181818181818181818",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "duplicate_entry",
+  "expect": {
+    "evidence_hash": "fbb7b71944fa12890b8826bbf5d8e265dee7ee146badb98626e49224f91b40d2",
+    "canonical_bytes_sha256": "43ab424f6e3fa65ba6fbd5fd7c00e71bac28815156be4047f16631bb9afe955c",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_ENTRY_NAME",
+    "exit_code": 2,
+    "chain": "unverified"
+  }
+}
