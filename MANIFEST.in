@@ -1,0 +1,9 @@
+include LICENSE
+include README.md
+include SPEC.md
+include DECISIONS_LOG.md
+
+recursive-include aot_ev1/schema *.json
+recursive-include schema *.json
+recursive-include vectors *.json *.md
+recursive-include tests *.py
