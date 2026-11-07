@@ -8,7 +8,7 @@ version = "0.1.0.dev0"
 description = "AOT-EV1 — deterministic evidence layer for the ERC-8325 evidenceHash slot"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [{name = "AOTrust", email = "legal@aotrust.link"}]
 keywords = ["evidence", "attestation", "erc-8325", "jcs", "ed25519", "provenance"]
 dependencies = ["pynacl>=1.5"]
@@ -26,3 +26,6 @@ include = ["aot_ev1*"]
 
 [tool.setuptools.package-data]
 aot_ev1 = ["schema/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -10,6 +10,34 @@ Deterministic evidence layer for the `evidenceHash` slot of ERC-8325: **who** as
 
 Core is independent of any service; anchoring is an optional extra (`[anchor]`).
 
+## Usage
+
+```bash
+aotev canonical payload.json          # canonical bytes + evidence_hash
+aotev sign --payload payload.json --issuer-key <seed-hex> --out signed/
+aotev bundle signed/ -o evidence.aotev.zip
+aotev verify evidence.aotev.zip --now 1750000000
+aotev verify evidence.aotev.zip --chain previous.aotev.zip
+aotev inspect evidence.aotev.zip
+aotev inspect --types
+```
+
+Exit codes: `0` valid, `2` broken (steps 1–10), `3` signature-valid but
+expired/revoked, `4` chain error. Verification is fully offline; without
+`--chain` the status is `chain: unverified` and that is not an error.
+
+EIP-712 bundles need a `chainId` for verification. The bundle format does not
+carry it (SPEC §4 fixes only `name`/`version`/`chainId` in the domain), so
+`aotev` uses `--chain-id` with a default of `1`; pass the value used at signing
+time for other chains.
+
+Deterministic defaults: `created_at` defaults to `payload.valid_from`, so two
+`bundle` runs over the same input produce the same file.
+
+Test-only keys live in `tests/helpers.py` and `vectors/`; they are never used
+in production. Conformance vectors are regenerated with
+`PYTHONPATH=. python tests/test_vectors.py --write`.
+
 Status: **v0.1 in development**. Contract: [SPEC.md](SPEC.md).
 
 License: Apache-2.0. Maintained by the AOTrust project (legal@aotrust.link).
