@@ -10,6 +10,7 @@ from typing import Sequence
 from . import __version__
 from .canonical import canonical_bytes, evidence_hash_hex, parse_payload
 from .errors import AOTEV1Error, exit_code_for
+from .bundle import read_signed_dir, write_bundle
 from .schema_lite import validate_payload
 from .sign import eip712_types, sign_evidence
 
@@ -79,6 +80,16 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_bundle(args: argparse.Namespace) -> int:
+    payload, signatures = read_signed_dir(args.directory)
+    out = Path(args.out) if args.out else Path(f"{evidence_hash_hex(payload)}.aotev.zip")
+    digest = write_bundle(out, payload, signatures, args.created_at)
+    sys.stdout.write(f"bundle: {out}\n")
+    sys.stdout.write(f"evidence_hash: {evidence_hash_hex(payload)}\n")
+    sys.stdout.write(f"bundle_sha256: {digest}\n")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aotev",
@@ -103,6 +114,12 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("path", nargs="?", help="bundle file")
     inspect.add_argument("--types", action="store_true", help="print payload and EIP-712 type tables")
     inspect.set_defaults(func=_cmd_inspect)
+
+    bundle = sub.add_parser("bundle", help="pack a signed payload directory into a deterministic zip")
+    bundle.add_argument("directory", help="directory with payload.json and signatures/")
+    bundle.add_argument("-o", "--out", help="output zip path (default: <evidence_hash>.aotev.zip)")
+    bundle.add_argument("--created-at", type=int, help="manifest created_at (default: payload.valid_from)")
+    bundle.set_defaults(func=_cmd_bundle)
     return parser
 
 
