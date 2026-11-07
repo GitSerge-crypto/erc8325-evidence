@@ -10,22 +10,17 @@ AUDITOR_SEED = bytes.fromhex("22" * 32)
 EVM_SEED = "0x" + "33" * 32
 EVM_AUDITOR_SEED = "0x" + "44" * 32
 
-ISSUER_PUB = bytes.fromhex(
-    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
-)
-AUDITOR_PUB = bytes.fromhex(
-    "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
-)
-
-ISSUER_KEY_ID = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
-AUDITOR_KEY_ID = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+ISSUER_KEY_ID = "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737"
+AUDITOR_KEY_ID = "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0"
+EVM_ISSUER_ADDRESS = "0x5CbDd86a2FA8Dc4bDdd8a8f69dBa48572EeC07FB"
+EVM_AUDITOR_ADDRESS = "0x7564105E977516C53bE337314c7E53838967bDaC"
 
 
 def valid_payload() -> dict[str, Any]:
     """A schema-valid payload; callers may mutate the returned deep copy."""
     return {
         "v": "1",
-        "issuer": {"scheme": "ed25519", "key_id": "aa" * 32, "display": "AOTrust test issuer"},
+        "issuer": {"scheme": "ed25519", "key_id": ISSUER_KEY_ID, "display": "AOTrust test issuer"},
         "auditor": None,
         "subject": {
             "type": "document",
