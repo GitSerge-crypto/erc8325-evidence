@@ -32,6 +32,8 @@ from aot_ev1.ed25519_strict import L
 from aot_ev1.sign import sign_ed25519, sign_evidence
 from aot_ev1.verify import verify_bytes
 
+pytestmark = pytest.mark.filterwarnings("ignore:Duplicate name:UserWarning")
+
 VECTORS = Path(__file__).resolve().parents[1] / "vectors"
 CREATED_AT = 1_700_000_000
 NOW = 1_750_000_000

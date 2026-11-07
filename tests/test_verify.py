@@ -12,6 +12,8 @@ from aot_ev1.canonical import canonical_bytes, evidence_hash_hex
 from aot_ev1.sign import ed25519_key_id, sign_ed25519, sign_evidence
 from aot_ev1.verify import verify_bytes
 
+pytestmark = pytest.mark.filterwarnings("ignore:Duplicate name:UserWarning")
+
 from helpers import (
     AUDITOR_SEED,
     EVM_AUDITOR_ADDRESS,
