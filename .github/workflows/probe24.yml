@@ -1,0 +1,7 @@
+name: probe24
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
