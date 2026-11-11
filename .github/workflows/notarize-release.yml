@@ -28,8 +28,13 @@ jobs:
         with:
           files: 'dist/*'
       - name: Summary
+        env:
+          SHIELD_ID: ${{ steps.notarize.outputs.shield_id }}
+          VERIFY_URL: ${{ steps.notarize.outputs.verify_url }}
         run: |
-          echo "### This release is anchored" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Shield ID: **${ steps.notarize.outputs.shield_id }**" >> $GITHUB_STEP_SUMMARY
-          echo "Verify: ${ steps.notarize.outputs.verify_url }" >> $GITHUB_STEP_SUMMARY
+          {
+            echo '### This release is anchored'
+            echo ''
+            echo "Shield ID: **${SHIELD_ID}**"
+            echo "Verify: ${VERIFY_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
