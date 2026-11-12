@@ -58,3 +58,26 @@ current bundle never depends on a neighbour to be verifiable.
   separate code for them.
 * Exit-code precedence follows SPEC §8: steps 1–10 → `2`, chain → `4`,
   expired/revoked → `3`, valid → `0`.
+
+## D-xx — signing domain is stored in the manifest (supersedes D2)
+
+`D2` made `chainId` a verifier input only. That breaks the product promise: a verifier who
+receives a bundle years later must not have to guess which chain the signature belongs to.
+Self-contained verification outranks byte stability of a format that is not frozen yet
+(v1 has zero external adopters as of 2026-11-12).
+
+The manifest carries exactly one field describing the signing domain:
+
+    "domain": {"name": "AOT-EV1", "version": "1", "chain_id": <int>}
+
+`--chain-id` remains a CLI convenience for signing, but verification reads the domain from
+the manifest and rejects a mismatch (`DOMAIN_MISMATCH`, exit 2). Bundles without a `domain`
+field (v0.1 era) still verify and report `valid_legacy` with exit code 0; they are never
+silently upgraded.
+
+Byte impact: `bundle_hash` gains a domain prefix `b"AOT-EV1-BUNDLE\x00"`, so all vectors
+are regenerated. PDR receipts (239 bytes) and notarization are unaffected - the evidence
+layer and the time layer stay independent.
+
+**Type:** format-bytes change. **Approved by:** owner (Type 1, 2026-11-12). **Reversible:** no
+(superseded bundles keep verifying; the format itself cannot go back).
