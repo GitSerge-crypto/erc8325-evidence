@@ -41,3 +41,10 @@ in production. Conformance vectors are regenerated with
 Status: **v0.1 in development**. Contract: [SPEC.md](SPEC.md).
 
 License: Apache-2.0. Maintained by the AOTrust project (legal@aotrust.link).
+
+## Anchored release
+
+**This release is anchored:** [Shield ID `a93dad4d`](https://verify.aotrust.link/s/a93dad4d) - the published sdist
+of version `0.1.1` has a public first record in the AOTrust log (Ed25519-signed receipt, Merkle root
+committed hourly to NEAR). Verify it without trusting us, or check the whole log with the
+[exit kit](https://docs.aotrust.link/exit-kit.html).
