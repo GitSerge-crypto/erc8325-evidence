@@ -329,6 +329,11 @@ def _assemble(
     return _write_zip(records)
 
 
+def _require_eth() -> None:
+    """EIP-712 vectors need the optional evm dependency."""
+    pytest.importorskip("eth_account")
+
+
 def build_bundle(case: dict[str, Any]) -> bytes:
     payload = case["payload"]
     keys = case["keys"]
@@ -511,6 +516,7 @@ VECTOR_FILES = sorted(VECTORS.glob("*.json"))
 
 @pytest.mark.parametrize("path", VECTOR_FILES, ids=lambda path: path.stem)
 def test_vector(path, tmp_path):
+    _require_eth()
     case = json.loads(path.read_text())
     result = run_case(case, tmp_path)
     expect = case["expect"]
@@ -527,6 +533,7 @@ def test_vector(path, tmp_path):
 
 
 def test_positive_vectors_are_byte_stable(tmp_path):
+    _require_eth()
     positives = [case for case in CASES if case["name"].startswith("positive_")]
     assert len(positives) == 4
     for case in positives:
@@ -534,6 +541,7 @@ def test_positive_vectors_are_byte_stable(tmp_path):
 
 
 def test_all_negative_cases_from_brief_are_covered():
+    _require_eth()
     names = {case["name"] for case in CASES}
     required = {
         "negative_tampered_payload",

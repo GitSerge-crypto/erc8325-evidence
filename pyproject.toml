@@ -16,7 +16,7 @@ dependencies = ["pynacl>=1.5"]
 [project.optional-dependencies]
 evm = ["eth-account>=0.13"]
 anchor = []
-dev = ["pytest>=8", "build>=1.2"]
+dev = ["pytest>=8", "build>=1.2", "eth-account>=0.13"]
 
 [project.scripts]
 aotev = "aot_ev1.cli:main"

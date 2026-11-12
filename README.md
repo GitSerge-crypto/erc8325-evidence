@@ -38,7 +38,14 @@ Deterministic defaults: `created_at` defaults to `payload.valid_from`, so two
 `bundle` runs over the same input produce the same file.
 
 Test-only keys live in `tests/helpers.py` and `vectors/`; they are never used
-in production. Conformance vectors are regenerated with
+in production. Run the full suite (EIP-712 vectors need the `evm` dependency, included in `dev`):
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
+Conformance vectors are regenerated with
 `PYTHONPATH=. python tests/test_vectors.py --write`.
 
 Status: **v0.1 in development**. Contract: [SPEC.md](SPEC.md) (English, normative);
