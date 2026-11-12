@@ -37,7 +37,7 @@
   "expect": {
     "evidence_hash": "10664e253a85480626815f86399fd9843173118a1bb691a1e301c97ea2ef157b",
     "canonical_bytes_sha256": "c1005678bddd6ba42cbaf526f3124fbabc416ee8353a1d77db5790e8f04cccec",
-    "bundle_sha256": "19a37b41c4045026ce4e945ce1de000135ea043da7d41257c2cc812b38638ab4",
+    "bundle_sha256": "366327852b6edf21715d96cbaeb874e60e73be55179b487a37b0da186f297b77",
     "verdict": "valid",
     "error": null,
     "exit_code": 0,

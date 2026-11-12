@@ -10,7 +10,7 @@ from typing import Any
 
 from nacl.signing import SigningKey
 
-from .canonical import evidence_hash
+from .canonical import DOMAIN_NAME, DOMAIN_VERSION, evidence_hash
 from .ed25519_strict import verify_strict
 from .errors import SignatureError
 from .jcs_strict import canonical_bytes
@@ -51,6 +51,8 @@ PAYLOAD_FIELDS: tuple[tuple[str, str], ...] = (
     ("nonce", "str(64 hex)"),
     ("prev_evidence_hash", "str(64 hex)|null"),
     ("revocation", "Revocation|null"),
+    ("superseded_by", "str(64 hex)|null (optional)"),
+    ("revoked_by", "str(64 hex)|null (optional)"),
 )
 
 
@@ -99,7 +101,7 @@ def _claim_keccak(claims: Any) -> bytes:
     return keccak(canonical_bytes(claims))
 
 
-def eip712_types() -> dict[str, list[dict[str, str]]]:
+def eip712_types(*, legacy: bool = False) -> dict[str, list[dict[str, str]]]:
     """EIP-712 types for the payload (SPEC.md §4).
 
     ``claims`` is committed as ``bytes32 = keccak256(canonical_bytes(claims))``
@@ -107,7 +109,30 @@ def eip712_types() -> dict[str, list[dict[str, str]]]:
     use EIP-712's native zero-hash encoding when null; ``valid_until: null``
     is encoded as ``0`` (a value the format itself forbids, so it cannot
     collide with a real timestamp).
+
+    ``legacy=True`` reproduces the pre-revocation v0.1 type (no
+    ``superseded_by``/``revoked_by``) so that bundles without a manifest
+    ``domain`` keep verifying.
     """
+    evidence = [
+        {"name": "v", "type": "string"},
+        {"name": "issuer", "type": "Identity"},
+        {"name": "auditor", "type": "Identity"},
+        {"name": "subject", "type": "Subject"},
+        {"name": "claims", "type": "bytes32"},
+        {"name": "valid_from", "type": "uint64"},
+        {"name": "valid_until", "type": "uint64"},
+        {"name": "nonce", "type": "string"},
+        {"name": "prev_evidence_hash", "type": "string"},
+        {"name": "revocation", "type": "Revocation"},
+    ]
+    if not legacy:
+        evidence.extend(
+            [
+                {"name": "superseded_by", "type": "string"},
+                {"name": "revoked_by", "type": "string"},
+            ]
+        )
     return {
         "Identity": [
             {"name": "scheme", "type": "string"},
@@ -124,28 +149,17 @@ def eip712_types() -> dict[str, list[dict[str, str]]]:
             {"name": "revoked_at", "type": "uint64"},
             {"name": "reason", "type": "string"},
         ],
-        "Evidence": [
-            {"name": "v", "type": "string"},
-            {"name": "issuer", "type": "Identity"},
-            {"name": "auditor", "type": "Identity"},
-            {"name": "subject", "type": "Subject"},
-            {"name": "claims", "type": "bytes32"},
-            {"name": "valid_from", "type": "uint64"},
-            {"name": "valid_until", "type": "uint64"},
-            {"name": "nonce", "type": "string"},
-            {"name": "prev_evidence_hash", "type": "string"},
-            {"name": "revocation", "type": "Revocation"},
-        ],
+        "Evidence": evidence,
     }
 
 
-def eip712_message(payload: dict[str, Any]) -> dict[str, Any]:
+def eip712_message(payload: dict[str, Any], *, legacy: bool = False) -> dict[str, Any]:
     """Project a payload onto the EIP-712 message shape (documented mapping)."""
     claims = _claim_keccak(payload["claims"])
     valid_until = payload["valid_until"]
     if valid_until is None:
         valid_until = 0
-    return {
+    message: dict[str, Any] = {
         "v": payload["v"],
         "issuer": dict(payload["issuer"]),
         "auditor": dict(payload["auditor"]) if payload["auditor"] is not None else None,
@@ -157,17 +171,23 @@ def eip712_message(payload: dict[str, Any]) -> dict[str, Any]:
         "prev_evidence_hash": payload["prev_evidence_hash"],
         "revocation": dict(payload["revocation"]) if payload["revocation"] is not None else None,
     }
+    if not legacy:
+        message["superseded_by"] = payload.get("superseded_by")
+        message["revoked_by"] = payload.get("revoked_by")
+    return message
 
 
-def eip712_typed_data(payload: dict[str, Any], chain_id: int) -> dict[str, Any]:
+def eip712_typed_data(
+    payload: dict[str, Any], chain_id: int, *, legacy: bool = False
+) -> dict[str, Any]:
     """Full EIP-712 typed data (domain without ``verifyingContract``)."""
     if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id < 0:
         raise ValueError("chain_id must be a non-negative integer")
     return {
-        "types": eip712_types(),
+        "types": eip712_types(legacy=legacy),
         "primaryType": "Evidence",
-        "domain": {"name": "AOT-EV1", "version": "1", "chainId": chain_id},
-        "message": eip712_message(payload),
+        "domain": {"name": DOMAIN_NAME, "version": DOMAIN_VERSION, "chainId": chain_id},
+        "message": eip712_message(payload, legacy=legacy),
     }
 
 
@@ -200,24 +220,32 @@ def eip712_key_id(private_key: str | bytes) -> str:
     return str(Account.from_key(private_key).address)
 
 
-def sign_eip712(private_key: str | bytes, payload: dict[str, Any], chain_id: int) -> bytes:
+def sign_eip712(
+    private_key: str | bytes, payload: dict[str, Any], chain_id: int, *, legacy: bool = False
+) -> bytes:
+    if legacy and (payload.get("superseded_by") or payload.get("revoked_by")):
+        raise SignatureError("legacy EIP-712 cannot bind revocation fields")
     Account = _evm()
     if isinstance(private_key, bytes):
         private_key = "0x" + private_key.hex()
-    signed = Account.sign_typed_data(private_key, full_message=eip712_typed_data(payload, chain_id))
+    signed = Account.sign_typed_data(
+        private_key, full_message=eip712_typed_data(payload, chain_id, legacy=legacy)
+    )
     signature = bytes(signed.signature)
     if len(signature) != 65:
         raise SignatureError("EIP-712 signature is not 65 bytes")
     return signature
 
 
-def recover_eip712(signature: bytes, payload: dict[str, Any], chain_id: int) -> str:
+def recover_eip712(
+    signature: bytes, payload: dict[str, Any], chain_id: int, *, legacy: bool = False
+) -> str:
     encode_typed_data = _eip712_encoder()
 
     Account = _evm()
     if len(signature) != 65:
         raise SignatureError(f"EIP-712 signature must be 65 bytes, got {len(signature)}")
-    message = encode_typed_data(full_message=eip712_typed_data(payload, chain_id))
+    message = encode_typed_data(full_message=eip712_typed_data(payload, chain_id, legacy=legacy))
     try:
         return str(Account.recover_message(message, signature=bytes(signature)))
     except Exception as exc:
@@ -233,6 +261,8 @@ def sign_evidence(
     role: str,
     key: str | bytes,
     chain_id: int = 1,
+    *,
+    legacy: bool = False,
 ) -> bytes:
     """Sign ``payload`` for ``role`` using the scheme in ``payload[role]``.
 
@@ -259,7 +289,7 @@ def sign_evidence(
             raise SignatureError(
                 f"{role}.key_id does not match the signing key ({expected})"
             )
-        return sign_eip712(key, payload, chain_id)
+        return sign_eip712(key, payload, chain_id, legacy=legacy)
     raise SignatureError(f"unsupported scheme: {scheme!r}")
 
 
@@ -268,6 +298,8 @@ def verify_signature(
     role: str,
     signature: bytes,
     chain_id: int = 1,
+    *,
+    legacy: bool = False,
 ) -> bool:
     """Verify a signature against the scheme declared in the payload."""
     if role not in ROLES:
@@ -289,7 +321,7 @@ def verify_signature(
         if len(signature) != 65:
             return False
         try:
-            recovered = recover_eip712(signature, payload, chain_id)
+            recovered = recover_eip712(signature, payload, chain_id, legacy=legacy)
         except SignatureError:
             return False
         return recovered == identity["key_id"]

@@ -135,6 +135,7 @@ def test_inspect_bundle(tmp_path, capsys):
     assert "evidence_hash:" in out
     assert "signatures/issuer.ed25519" in out
     assert '"v": "1"' in out
+    assert "domain: AOT-EV1 1 chain_id=1" in out
 
 
 def test_inspect_bad_bundle(tmp_path, capsys):

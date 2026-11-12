@@ -19,7 +19,7 @@ from aot_ev1.bundle import (
     signature_file,
     write_bundle,
 )
-from aot_ev1.canonical import canonical_bytes
+from aot_ev1.canonical import BUNDLE_HASH_DOMAIN, canonical_bytes
 from aot_ev1.errors import AOTEV1Error
 from aot_ev1.sign import ed25519_key_id, sign_evidence
 
@@ -80,6 +80,7 @@ def test_manifest_is_canonical_and_lists_all_entries():
     assert raw == canonical_bytes(manifest)
     assert manifest["v"] == "1"
     assert manifest["created_at"] == payload["valid_from"]
+    assert manifest["domain"] == {"name": "AOT-EV1", "version": "1", "chain_id": 1}
     names = sorted(info.filename for info in archive.infolist() if info.filename != MANIFEST_NAME)
     assert [entry["name"] for entry in manifest["entries"]] == names
     assert manifest["evidence_hash"] == hashlib.sha256(b"AOT-EV1" + canonical_bytes(payload)).hexdigest()
@@ -90,11 +91,41 @@ def test_manifest_is_canonical_and_lists_all_entries():
 
 def test_bundle_hash_formula():
     entries = [("b.txt", b"two"), ("a.txt", b"one")]
-    expected = hashlib.sha256(
-        b"a.txt\x00" + hashlib.sha256(b"one").digest() + b"b.txt\x00" + hashlib.sha256(b"two").digest()
+    body = (
+        b"a.txt\x00"
+        + hashlib.sha256(b"one").digest()
+        + b"b.txt\x00"
+        + hashlib.sha256(b"two").digest()
+    )
+    assert bundle_hash(entries) == hashlib.sha256(BUNDLE_HASH_DOMAIN + b"\x00" + body).digest()
+    assert bundle_hash(list(reversed(entries))) == bundle_hash(entries)
+    assert bundle_hash(entries, legacy=True) == hashlib.sha256(body).digest()
+    assert bundle_hash(entries) != bundle_hash(entries, legacy=True)
+
+
+def test_bundle_hash_domain_prefix_is_not_optional():
+    entries = [("a.txt", b"one")]
+    assert bundle_hash(entries) == hashlib.sha256(
+        b"AOT-EV1-BUNDLE\x00" + b"a.txt\x00" + hashlib.sha256(b"one").digest()
     ).digest()
-    assert bundle_hash(entries) == expected
-    assert bundle_hash(list(reversed(entries))) == expected
+
+
+def test_chain_id_is_written_once_to_the_manifest_domain():
+    payload, signatures = signed()
+    manifest = json.loads(
+        zipfile.ZipFile(io.BytesIO(bundle_bytes(payload, signatures, chain_id=137))).read(MANIFEST_NAME)
+    )
+    assert manifest["domain"] == {"name": "AOT-EV1", "version": "1", "chain_id": 137}
+    assert "chain_id" not in manifest
+    manifest = json.loads(zipfile.ZipFile(io.BytesIO(bundle_bytes(payload, signatures))).read(MANIFEST_NAME))
+    assert manifest["domain"]["chain_id"] == 1
+
+
+@pytest.mark.parametrize("chain_id", [-1, 2**53, "1", True, 1.0])
+def test_invalid_chain_id(chain_id):
+    payload, signatures = signed()
+    with pytest.raises(AOTEV1Error):
+        bundle_bytes(payload, signatures, chain_id=chain_id)
 
 
 def test_created_at_override_and_default():

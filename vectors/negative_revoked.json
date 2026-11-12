@@ -26,7 +26,8 @@
     "revocation": {
       "revoked_at": 1710000000,
       "reason": "key compromise"
-    }
+    },
+    "revoked_by": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   },
   "keys": {
     "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -38,8 +39,8 @@
   "chain": null,
   "mutate": "none",
   "expect": {
-    "evidence_hash": "b5e335fbb76754993e320f694bac65f4a3c6c9785e951d090a7de945246b1e6e",
-    "canonical_bytes_sha256": "b509f9db995f248ba241e5a48d082b23487ec54b3accfdf18b25fab9c385f1be",
+    "evidence_hash": "7f49f23f9f74749563e03a424a95eac8d17e5a5925a527e30cbefdddc3fd96b5",
+    "canonical_bytes_sha256": "74b2ef477a4d2a3f9ac9cd290c08809daa842f97662d5ce18b5e6f42866fc9df",
     "bundle_sha256": null,
     "verdict": "revoked",
     "error": "E_REVOKED",

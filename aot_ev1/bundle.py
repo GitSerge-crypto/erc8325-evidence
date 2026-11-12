@@ -8,7 +8,14 @@ import zipfile
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from .canonical import canonical_bytes, check_canonical_payload, evidence_hash_hex
+from .canonical import (
+    BUNDLE_HASH_DOMAIN,
+    DOMAIN_NAME,
+    DOMAIN_VERSION,
+    canonical_bytes,
+    check_canonical_payload,
+    evidence_hash_hex,
+)
 from .errors import AOTEV1Error
 from .jcs_strict import MAX_SAFE_INT
 from .schema_lite import validate_payload
@@ -49,12 +56,21 @@ def signature_file(role: str, scheme: str) -> str:
     return f"signatures/{role}.{suffix}"
 
 
-def bundle_hash(entries: Iterable[tuple[str, bytes]]) -> bytes:
-    """``sha256`` over ``name + b"\\x00" + sha256(content)`` sorted by name."""
+def bundle_hash(entries: Iterable[tuple[str, bytes]], *, legacy: bool = False) -> bytes:
+    """Domain-separated bundle hash (SPEC.md §7).
+
+    ``sha256(b"AOT-EV1-BUNDLE\x00" + concat(name || b"\x00" || sha256(content)))``
+    with names sorted ascending. ``legacy=True`` recomputes the pre-domain
+    v0.1 formula and is only used to verify bundles whose manifest has no
+    ``domain`` field.
+    """
     parts = []
     for name, content in sorted(entries, key=lambda item: item[0]):
         parts.append(name.encode("ascii") + b"\x00" + hashlib.sha256(content).digest())
-    return hashlib.sha256(b"".join(parts)).digest()
+    body = b"".join(parts)
+    if legacy:
+        return hashlib.sha256(body).digest()
+    return hashlib.sha256(BUNDLE_HASH_DOMAIN + b"\x00" + body).digest()
 
 
 def _signature_entries(
@@ -86,10 +102,19 @@ def _signature_entries(
     return entries
 
 
+def _check_chain_id(chain_id: int) -> int:
+    if not isinstance(chain_id, int) or isinstance(chain_id, bool):
+        raise AOTEV1Error("chain_id must be an integer")
+    if chain_id < 0 or chain_id > MAX_SAFE_INT:
+        raise AOTEV1Error("chain_id outside the safe integer range")
+    return chain_id
+
+
 def build_manifest(
     payload: dict,
     data_entries: list[tuple[str, bytes]],
     created_at: int,
+    chain_id: int = 1,
 ) -> dict:
     signatures = []
     for role in ("issuer", "auditor"):
@@ -108,6 +133,11 @@ def build_manifest(
     return {
         "v": "1",
         "created_at": created_at,
+        "domain": {
+            "name": DOMAIN_NAME,
+            "version": DOMAIN_VERSION,
+            "chain_id": _check_chain_id(chain_id),
+        },
         "evidence_hash": evidence_hash_hex(payload),
         "payload_sha256": hashlib.sha256(payload_bytes).hexdigest(),
         "entries": [
@@ -144,6 +174,7 @@ def bundle_bytes(
     payload: dict,
     signatures: Mapping[str, bytes],
     created_at: int | None = None,
+    chain_id: int = 1,
 ) -> bytes:
     """Build deterministic zip bytes for ``payload`` and its signatures."""
     validate_payload(payload)
@@ -162,7 +193,7 @@ def bundle_bytes(
     if sum(len(content) for _, content in data_entries) > MAX_UNCOMPRESSED:
         raise AOTEV1Error(f"bundle exceeds {MAX_UNCOMPRESSED} uncompressed bytes")
 
-    manifest = build_manifest(payload, data_entries, created_at)
+    manifest = build_manifest(payload, data_entries, created_at, chain_id)
     records = [(MANIFEST_NAME, canonical_bytes(manifest))]
     records.extend(sorted(data_entries, key=lambda item: item[0]))
     return _write_zip(records)
@@ -173,9 +204,10 @@ def write_bundle(
     payload: dict,
     signatures: Mapping[str, bytes],
     created_at: int | None = None,
+    chain_id: int = 1,
 ) -> str:
     """Write ``bundle_bytes`` to ``path`` and return the sha256 hex digest."""
-    data = bundle_bytes(payload, signatures, created_at)
+    data = bundle_bytes(payload, signatures, created_at, chain_id)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)

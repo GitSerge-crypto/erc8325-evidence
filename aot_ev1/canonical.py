@@ -11,6 +11,9 @@ from .jcs_strict import MAX_SAFE_INT, canonical_bytes, canonical_text
 
 __all__ = [
     "EVIDENCE_DOMAIN",
+    "BUNDLE_HASH_DOMAIN",
+    "DOMAIN_NAME",
+    "DOMAIN_VERSION",
     "canonical_bytes",
     "canonical_text",
     "evidence_hash",
@@ -20,7 +23,14 @@ __all__ = [
     "check_canonical_payload",
 ]
 
+# Both prefixes are part of the v1 contract: changing either breaks every
+# existing hash, so they must never be edited in place.
 EVIDENCE_DOMAIN = b"AOT-EV1"
+BUNDLE_HASH_DOMAIN = b"AOT-EV1-BUNDLE"
+
+# Signing domain shared by EIP-712 typed data and the bundle manifest.
+DOMAIN_NAME = "AOT-EV1"
+DOMAIN_VERSION = "1"
 
 
 def _reject_float(token: str) -> NoReturn:

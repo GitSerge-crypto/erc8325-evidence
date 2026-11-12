@@ -154,6 +154,39 @@ def test_eip712_claims_are_committed_as_bytes32():
         S.eip712_typed_data(payload_copy(claims={"x": 1.5}), 1)
 
 
+def test_eip712_types_bind_revocation_fields():
+    new_fields = [item["name"] for item in S.eip712_types()["Evidence"]]
+    legacy_fields = [item["name"] for item in S.eip712_types(legacy=True)["Evidence"]]
+    assert new_fields[-2:] == ["superseded_by", "revoked_by"]
+    assert "superseded_by" not in legacy_fields
+    assert new_fields[:10] == legacy_fields
+
+
+def test_eip712_message_includes_optional_fields():
+    payload = eip712_payload(superseded_by="dd" * 32)
+    message = S.eip712_typed_data(payload, 1)["message"]
+    assert message["superseded_by"] == "dd" * 32
+    assert message["revoked_by"] is None
+    legacy_message = S.eip712_typed_data(payload, 1, legacy=True)["message"]
+    assert "superseded_by" not in legacy_message
+
+
+def test_eip712_new_and_legacy_signatures_differ():
+    payload = eip712_payload()
+    new = S.sign_evidence(payload, "issuer", EVM_SEED)
+    legacy = S.sign_evidence(payload, "issuer", EVM_SEED, legacy=True)
+    assert new != legacy
+    assert S.verify_signature(payload, "issuer", new)
+    assert not S.verify_signature(payload, "issuer", legacy)
+    assert S.verify_signature(payload, "issuer", legacy, legacy=True)
+
+
+def test_legacy_eip712_refuses_to_sign_revocation_fields():
+    payload = eip712_payload(superseded_by="dd" * 32)
+    with pytest.raises(SignatureError, match="legacy"):
+        S.sign_evidence(payload, "issuer", EVM_SEED, legacy=True)
+
+
 def test_eip712_rejects_short_signature():
     payload = eip712_payload()
     with pytest.raises(SignatureError):

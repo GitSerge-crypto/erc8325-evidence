@@ -2,6 +2,7 @@
 
 import hashlib
 import io
+import json
 import socket
 import zipfile
 
@@ -30,15 +31,31 @@ NOW = 1_750_000_000
 CREATED_AT = 1_700_000_000
 
 
-def signed_bundle(payload=None):
+REVOKED_BY = "ee" * 32
+SUPERSEDED_BY = "dd" * 32
+
+
+def signed_bundle(payload=None, chain_id=1):
     payload = payload or valid_payload()
     issuer_key = ISSUER_SEED if payload["issuer"]["scheme"] == "ed25519" else EVM_SEED
-    signatures = {"issuer": sign_evidence(payload, "issuer", issuer_key)}
+    signatures = {"issuer": sign_evidence(payload, "issuer", issuer_key, chain_id)}
     if payload["auditor"] is not None:
         scheme = payload["auditor"]["scheme"]
         key = AUDITOR_SEED if scheme == "ed25519" else EVM_AUDITOR_SEED
-        signatures["auditor"] = sign_evidence(payload, "auditor", key)
-    return bundle_bytes(payload, signatures, created_at=CREATED_AT)
+        signatures["auditor"] = sign_evidence(payload, "auditor", key, chain_id)
+    return bundle_bytes(payload, signatures, created_at=CREATED_AT, chain_id=chain_id)
+
+
+def legacy_bundle(payload, signatures, chain_id=1):
+    entries = {PAYLOAD_NAME: canonical_bytes(payload)}
+    for role, signature in signatures.items():
+        entries[signature_file(role, payload[role]["scheme"])] = signature
+    data = sorted(entries.items())
+    manifest = build_manifest(payload, data, CREATED_AT, chain_id)
+    manifest.pop("domain")
+    manifest["bundle_hash"] = bundle_hash(data, legacy=True).hex()
+    records = [(MANIFEST_NAME, canonical_bytes(manifest))] + data
+    return _write_zip(records)
 
 
 def build(
@@ -114,7 +131,8 @@ def test_valid_bundle_eip712():
     assert result.status == "valid"
     assert result.exit_code == 0
     wrong_chain = verify_bytes(signed_bundle(payload), now=NOW, chain_id=5)
-    assert code(wrong_chain) == "E_SIGNATURE"
+    assert code(wrong_chain) == "E_DOMAIN_MISMATCH"
+    assert wrong_chain.exit_code == 2
 
 
 def test_valid_bundle_until_null():
@@ -180,6 +198,23 @@ def test_manifest_lists_missing_entry():
     payload, signatures = issuer_only()
     data = build(payload, signatures, omit="signatures/issuer.ed25519")
     assert code(verify_bytes(data, now=NOW)) == "E_MANIFEST"
+
+
+@pytest.mark.parametrize(
+    "domain",
+    [
+        None,
+        {"name": "AOT-EV1", "version": "1"},
+        {"name": "AOT-EV1", "version": "1", "chain_id": 1, "extra": True},
+        {"name": "AOT-EV1", "version": "1", "chain_id": "1"},
+    ],
+)
+def test_malformed_manifest_domain(domain):
+    payload, signatures = issuer_only()
+    data = build(payload, signatures, manifest_patch=lambda m: m.update(domain=domain))
+    result = verify_bytes(data, now=NOW)
+    assert code(result) in {"E_MANIFEST", "E_DOMAIN_MISMATCH"}
+    assert result.exit_code == 2
 
 
 def test_manifest_version_rejected():
@@ -380,7 +415,10 @@ def test_not_yet_valid():
 
 
 def test_revoked():
-    payload = payload_copy(revocation={"revoked_at": 1_710_000_000, "reason": "key compromise"})
+    payload = payload_copy(
+        revocation={"revoked_at": 1_710_000_000, "reason": "key compromise"},
+        revoked_by=REVOKED_BY,
+    )
     result = verify_bytes(signed_bundle(payload), now=NOW)
     assert result.status == "revoked"
     assert result.exit_code == 3
@@ -388,9 +426,131 @@ def test_revoked():
 
 
 def test_revoked_wins_over_expired():
-    payload = payload_copy(revocation={"revoked_at": 1_710_000_000, "reason": "test"})
+    payload = payload_copy(
+        revocation={"revoked_at": 1_710_000_000, "reason": "test"},
+        revoked_by=REVOKED_BY,
+    )
     result = verify_bytes(signed_bundle(payload), now=1_900_000_000)
     assert result.status == "revoked"
+    assert result.exit_code == 3
+
+
+def test_superseded():
+    payload = payload_copy(superseded_by=SUPERSEDED_BY)
+    result = verify_bytes(signed_bundle(payload), now=NOW)
+    assert result.status == "superseded"
+    assert result.exit_code == 3
+    assert code(result) == "E_SUPERSEDED"
+
+
+def test_revocation_incomplete_without_revoked_by():
+    payload = payload_copy(revocation={"revoked_at": 1_710_000_000, "reason": "test"})
+    result = verify_bytes(signed_bundle(payload), now=NOW)
+    assert result.status == "revocation_incomplete"
+    assert result.exit_code == 3
+    assert code(result) == "E_REVOCATION_INCOMPLETE"
+
+
+def test_revocation_incomplete_revoked_by_without_timestamp():
+    payload = payload_copy(revoked_by=REVOKED_BY)
+    result = verify_bytes(signed_bundle(payload), now=NOW)
+    assert result.status == "revocation_incomplete"
+    assert result.exit_code == 3
+    assert code(result) == "E_REVOCATION_INCOMPLETE"
+
+
+def test_revocation_conflict():
+    payload = payload_copy(
+        revocation={"revoked_at": 1_710_000_000, "reason": "test"},
+        revoked_by=REVOKED_BY,
+        superseded_by=SUPERSEDED_BY,
+    )
+    result = verify_bytes(signed_bundle(payload), now=NOW)
+    assert result.status == "revocation_conflict"
+    assert result.exit_code == 3
+    assert code(result) == "E_REVOCATION_CONFLICT"
+
+
+# -- domain and legacy bundles ---------------------------------------------
+
+
+def test_manifest_domain_is_authoritative():
+    result = verify_bytes(signed_bundle(chain_id=137), now=NOW)
+    assert result.status == "valid"
+    assert result.domain == {"name": "AOT-EV1", "version": "1", "chain_id": 137}
+    assert result.legacy is False
+
+
+def test_requested_chain_id_mismatch():
+    result = verify_bytes(signed_bundle(chain_id=137), now=NOW, chain_id=1)
+    assert code(result) == "E_DOMAIN_MISMATCH"
+    assert result.exit_code == 2
+
+
+def test_payload_domain_must_match_manifest():
+    payload = payload_copy(
+        domain={"name": "AOT-EV1", "version": "1", "chain_id": 2}
+    )
+    result = verify_bytes(signed_bundle(payload, chain_id=1), now=NOW)
+    assert code(result) == "E_DOMAIN_MISMATCH"
+    assert result.exit_code == 2
+
+
+def test_legacy_bundle_without_domain():
+    payload, signatures = issuer_only()
+    result = verify_bytes(legacy_bundle(payload, signatures), now=NOW)
+    assert result.status == "valid_legacy"
+    assert result.exit_code == 0
+    assert result.legacy is True
+    assert result.domain is None
+
+
+def test_legacy_eip712_bundle_still_verifies():
+    pytest.importorskip("eth_account")
+    payload = payload_copy(
+        issuer={"scheme": "eip712", "key_id": EVM_ISSUER_ADDRESS, "display": None}
+    )
+    signature = sign_evidence(payload, "issuer", EVM_SEED, 3, legacy=True)
+    result = verify_bytes(legacy_bundle(payload, {"issuer": signature}, 3), now=NOW, chain_id=3)
+    assert result.status == "valid_legacy"
+    assert result.exit_code == 0
+    wrong = verify_bytes(legacy_bundle(payload, {"issuer": signature}, 3), now=NOW, chain_id=5)
+    assert code(wrong) == "E_SIGNATURE"
+
+
+def test_stripping_domain_is_not_a_downgrade():
+    data = signed_bundle()
+    archive = zipfile.ZipFile(io.BytesIO(data))
+    records = []
+    for name in archive.namelist():
+        content = archive.read(name)
+        if name == MANIFEST_NAME:
+            manifest = json.loads(content)
+            manifest.pop("domain")
+            content = canonical_bytes(manifest)
+        records.append((name, content))
+    result = verify_bytes(_write_zip(records), now=NOW)
+    assert code(result) == "E_BUNDLE_HASH"
+    assert result.exit_code == 2
+
+
+def test_eip712_domain_strip_with_recomputed_legacy_hash_fails():
+    pytest.importorskip("eth_account")
+    payload = payload_copy(
+        issuer={"scheme": "eip712", "key_id": EVM_ISSUER_ADDRESS, "display": None}
+    )
+    signature = sign_evidence(payload, "issuer", EVM_SEED)
+    entries = {PAYLOAD_NAME: canonical_bytes(payload), "signatures/issuer.eip712": signature}
+    data = sorted(entries.items())
+    manifest = build_manifest(payload, data, CREATED_AT)
+    manifest.pop("domain")
+    manifest["bundle_hash"] = bundle_hash(data, legacy=True).hex()
+    forged = _write_zip([(MANIFEST_NAME, canonical_bytes(manifest))] + data)
+    # The manifest is not signed, but the EIP-712 signature binds the new
+    # typed-data shape, so a downgrade to legacy verification fails.
+    result = verify_bytes(forged, now=NOW)
+    assert code(result) == "E_SIGNATURE"
+    assert result.exit_code == 2
 
 
 # -- step 12: chain ---------------------------------------------------------

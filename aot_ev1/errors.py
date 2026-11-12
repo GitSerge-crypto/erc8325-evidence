@@ -16,6 +16,10 @@ __all__ = [
     "AuditorError",
     "ExpiredError",
     "RevokedError",
+    "SupersededError",
+    "RevocationIncompleteError",
+    "RevocationConflictError",
+    "DomainMismatchError",
     "ChainError",
     "EXIT_VALID",
     "EXIT_BROKEN",
@@ -93,11 +97,36 @@ class RevokedError(AOTEV1Error):
     code = "E_REVOKED"
 
 
+class SupersededError(AOTEV1Error):
+    code = "E_SUPERSEDED"
+
+
+class RevocationIncompleteError(AOTEV1Error):
+    code = "E_REVOCATION_INCOMPLETE"
+
+
+class RevocationConflictError(AOTEV1Error):
+    code = "E_REVOCATION_CONFLICT"
+
+
+class DomainMismatchError(AOTEV1Error):
+    code = "E_DOMAIN_MISMATCH"
+
+
 class ChainError(AOTEV1Error):
     code = "E_CHAIN"
 
 
-_STATUS_CODES = {E.code for E in (ExpiredError, RevokedError)}
+_STATUS_CODES = {
+    E.code
+    for E in (
+        ExpiredError,
+        RevokedError,
+        SupersededError,
+        RevocationIncompleteError,
+        RevocationConflictError,
+    )
+}
 _CHAIN_CODE = ChainError.code
 
 

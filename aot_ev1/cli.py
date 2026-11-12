@@ -100,6 +100,13 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
         raise AOTEV1Error(f"cannot inspect bundle: {exc}") from exc
     sys.stdout.write(f"evidence_hash: {manifest['evidence_hash']}\n")
     sys.stdout.write(f"created_at: {manifest['created_at']}\n")
+    domain = manifest.get("domain")
+    if domain is None:
+        sys.stdout.write("domain: none (legacy)\n")
+    else:
+        sys.stdout.write(
+            f"domain: {domain['name']} {domain['version']} chain_id={domain['chain_id']}\n"
+        )
     sys.stdout.write(f"bundle_hash: {manifest['bundle_hash']}\n")
     sys.stdout.write("entries:\n")
     for entry in manifest["entries"]:
@@ -117,7 +124,7 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
 def _cmd_bundle(args: argparse.Namespace) -> int:
     payload, signatures = read_signed_dir(args.directory)
     out = Path(args.out) if args.out else Path(f"{evidence_hash_hex(payload)}.aotev.zip")
-    digest = write_bundle(out, payload, signatures, args.created_at)
+    digest = write_bundle(out, payload, signatures, args.created_at, args.chain_id)
     sys.stdout.write(f"bundle: {out}\n")
     sys.stdout.write(f"evidence_hash: {evidence_hash_hex(payload)}\n")
     sys.stdout.write(f"bundle_sha256: {digest}\n")
@@ -135,6 +142,13 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         state = "ok" if step.ok else (step.error or "failed")
         sys.stdout.write(f"step {step.number:2d}: {state:<14} {step.name}\n")
     sys.stdout.write(f"status: {result.status}\n")
+    if result.legacy:
+        sys.stdout.write("legacy: true\n")
+    if result.domain is not None:
+        sys.stdout.write(
+            f"domain: {result.domain['name']} {result.domain['version']} "
+            f"chain_id={result.domain['chain_id']}\n"
+        )
     if result.bundle_sha256:
         sys.stdout.write(f"bundle_sha256: {result.bundle_sha256}\n")
     if result.evidence_hash:
@@ -149,7 +163,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aotev",
         description="AOT-EV1 — deterministic evidence layer for ERC-8325.",
-        epilog="Exit codes: 0 valid, 2 broken (steps 1-10), 3 expired/revoked, 4 chain error.",
+        epilog=(
+            "Exit codes: 0 valid, 2 broken (steps 1-10), "
+            "3 expired/superseded/revoked, 4 chain error."
+        ),
     )
     parser.add_argument("--version", action="version", version=f"aot-ev1 {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -175,13 +192,19 @@ def build_parser() -> argparse.ArgumentParser:
     bundle.add_argument("directory", help="directory with payload.json and signatures/")
     bundle.add_argument("-o", "--out", help="output zip path (default: <evidence_hash>.aotev.zip)")
     bundle.add_argument("--created-at", type=int, help="manifest created_at (default: payload.valid_from)")
+    bundle.add_argument("--chain-id", type=int, default=1, help="manifest domain chain_id (default: 1)")
     bundle.set_defaults(func=_cmd_bundle)
 
     verify = sub.add_parser("verify", help="verify a bundle offline (12 checks)")
     verify.add_argument("bundle", help="bundle file")
     verify.add_argument("--chain", help="previous bundle for chain continuity (optional)")
     verify.add_argument("--now", type=int, help="verification time in unix seconds (default: system clock)")
-    verify.add_argument("--chain-id", type=int, default=1, help="EIP-712 chainId (default: 1)")
+    verify.add_argument(
+        "--chain-id",
+        type=int,
+        default=None,
+        help="assert the manifest domain chain_id (default: read from the manifest; legacy: 1)",
+    )
     verify.set_defaults(func=_cmd_verify)
     return parser
 

@@ -81,3 +81,41 @@ layer and the time layer stay independent.
 
 **Type:** format-bytes change. **Approved by:** owner (Type 1, 2026-11-12). **Reversible:** no
 (superseded bundles keep verifying; the format itself cannot go back).
+
+## D6 — `bundle_hash` gains a domain prefix; legacy formula is verify-only
+
+Note: the manifest itself is not signed. For Ed25519 bundles the domain is informational (the
+signature is separated by the `AOT-EV1-sig-v1` prefix), so relabelling a new Ed25519 bundle as
+legacy only changes its reported status; a new EIP-712 bundle cannot be downgraded because its
+signature binds the newer typed-data shape.
+
+`bundle_hash` is now `sha256(b"AOT-EV1-BUNDLE\x00" ‖ concat(...))` (`BUNDLE_HASH_DOMAIN` next to
+`EVIDENCE_DOMAIN` in `canonical.py`; both prefixes are contract bytes). Reusing a bare content
+hash in a different protocol is no longer possible.
+
+Bundles whose manifest has no `domain` are v0.1-era bundles and keep verifying with the old
+formula (`bundle_hash(entries, legacy=True)`), status `valid_legacy`, exit code 0. The formula is
+selected by the presence of `domain`, and a stripped `domain` cannot downgrade a new bundle:
+the stored (prefixed) hash then fails step 4.
+
+## D7 — Revocation and supersession semantics
+
+`superseded_by` and `revoked_by` are optional top-level payload fields (schema allows their
+absence; v0.1 payloads stay valid) and are mutually exclusive:
+
+| payload state | status | code | exit |
+|---|---|---|---|
+| `superseded_by` set | `superseded` | `E_SUPERSEDED` | 3 |
+| `revoked_by` + `revocation.revoked_at` | `revoked` | `E_REVOKED` | 3 |
+| `revocation.revoked_at` without `revoked_by` | `revocation_incomplete` | `E_REVOCATION_INCOMPLETE` | 3 |
+| `revoked_by` without `revocation.revoked_at` | `revocation_incomplete` | `E_REVOCATION_INCOMPLETE` | 3 |
+| both `superseded_by` and `revoked_by` | `revocation_conflict` | `E_REVOCATION_CONFLICT` | 3 |
+
+Revocation/supersession is checked before the validity window. Revocation bundles are signed by
+the issuer; the library never fetches them, so offline verification cannot see revocations issued
+after receipt (documented in SPEC §5). Codes keep the existing `E_*` convention; the brief's
+`DOMAIN_MISMATCH` / `REVOCATION_INCOMPLETE` / `REVOCATION_CONFLICT` appear as
+`E_DOMAIN_MISMATCH` / `E_REVOCATION_INCOMPLETE` / `E_REVOCATION_CONFLICT`.
+
+EIP-712 `Evidence` gains `superseded_by` and `revoked_by` so signatures bind them; legacy
+verification uses the old 10-field type (see `eip712_types(legacy=True)`).

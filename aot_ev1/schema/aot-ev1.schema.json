@@ -38,7 +38,20 @@
     },
     "revocation": {
       "oneOf": [{ "$ref": "#/$defs/revocation" }, { "type": "null" }]
-    }
+    },
+    "superseded_by": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "revoked_by": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "domain": { "$ref": "#/$defs/domain" }
   },
   "$defs": {
     "nullableString": {
@@ -77,6 +90,16 @@
         "hash_alg": { "const": "sha256" },
         "hash": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
         "uri": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "chain_id"],
+      "properties": {
+        "name": { "const": "AOT-EV1" },
+        "version": { "const": "1" },
+        "chain_id": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
       }
     },
     "revocation": {

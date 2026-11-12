@@ -23,7 +23,14 @@ from .bundle import (
     bundle_hash,
     signature_file,
 )
-from .canonical import check_canonical_payload, evidence_hash, evidence_hash_hex, parse_json
+from .canonical import (
+    DOMAIN_NAME,
+    DOMAIN_VERSION,
+    check_canonical_payload,
+    evidence_hash,
+    evidence_hash_hex,
+    parse_json,
+)
 from .errors import (
     AOTEV1Error,
     AuditorError,
@@ -33,14 +40,18 @@ from .errors import (
     ChainError,
     EntryHashError,
     EntryNameError,
+    DomainMismatchError,
     EvidenceHashError,
     ExpiredError,
     ManifestError,
+    RevocationConflictError,
+    RevocationIncompleteError,
     RevokedError,
     SignatureError,
+    SupersededError,
     exit_code_for,
 )
-from .jcs_strict import canonical_bytes
+from .jcs_strict import MAX_SAFE_INT, canonical_bytes
 from .schema_lite import validate_payload
 from .sign import verify_signature
 
@@ -81,6 +92,8 @@ class VerifyResult:
     payload: dict[str, Any] | None = None
     error: AOTEV1Error | None = None
     steps: list[StepResult] = field(default_factory=list)
+    legacy: bool = False
+    domain: dict[str, Any] | None = None
 
     @property
     def exit_code(self) -> int:
@@ -107,11 +120,16 @@ def _entry_name_problem(name: str) -> str | None:
 
 
 class _Verifier:
-    def __init__(self, data: bytes, *, now: int, chain_path: str | Path | None, chain_id: int):
+    def __init__(
+        self, data: bytes, *, now: int, chain_path: str | Path | None, chain_id: int | None
+    ):
         self.data = data
         self.now = now
         self.chain_path = chain_path
-        self.chain_id = chain_id
+        self.requested_chain_id = chain_id
+        self.effective_chain_id = 1 if chain_id is None else chain_id
+        self.legacy = False
+        self.domain: dict[str, Any] | None = None
         self.steps: list[StepResult] = []
         self.result = VerifyResult(status="invalid", chain="unverified")
         self.result.bundle_sha256 = hashlib.sha256(data).hexdigest()
@@ -154,7 +172,9 @@ class _Verifier:
         self.result.steps = self.steps
         self.result.payload = self.payload
         self.result.evidence_hash = evidence_hash_hex(self.payload)
-        self.result.status = "valid"
+        self.result.legacy = self.legacy
+        self.result.domain = self.domain
+        self.result.status = "valid_legacy" if self.legacy else "valid"
         self.result.chain = "verified" if self.chain_path is not None else "unverified"
         return self.result
 
@@ -162,8 +182,14 @@ class _Verifier:
     def _status_for(error: AOTEV1Error) -> str:
         if error.code == "E_REVOKED":
             return "revoked"
+        if error.code == "E_SUPERSEDED":
+            return "superseded"
         if error.code == "E_EXPIRED":
             return "expired"
+        if error.code == "E_REVOCATION_INCOMPLETE":
+            return "revocation_incomplete"
+        if error.code == "E_REVOCATION_CONFLICT":
+            return "revocation_conflict"
         return "invalid"
 
     # -- step 1 ---------------------------------------------------------
@@ -238,6 +264,7 @@ class _Verifier:
             raise ManifestError("manifest.payload_sha256 must be 64 hex characters")
         if not _is_hex64(manifest["bundle_hash"]):
             raise ManifestError("manifest.bundle_hash must be 64 hex characters")
+        self._read_domain(manifest)
         entries = manifest["entries"]
         if not isinstance(entries, list) or not entries:
             raise ManifestError("manifest.entries must be a non-empty array")
@@ -278,13 +305,36 @@ class _Verifier:
                 raise ManifestError("signature file is not listed in manifest.entries")
         self.manifest = manifest
 
+    def _read_domain(self, manifest: dict[str, Any]) -> None:
+        if "domain" not in manifest:
+            # v0.1-era bundle: no signing domain in the manifest.
+            self.legacy = True
+            self.effective_chain_id = (
+                1 if self.requested_chain_id is None else self.requested_chain_id
+            )
+            return
+        domain = manifest["domain"]
+        if not isinstance(domain, dict) or set(domain) != {"name", "version", "chain_id"}:
+            raise ManifestError("manifest.domain must be {name, version, chain_id}")
+        if domain["name"] != DOMAIN_NAME or domain["version"] != DOMAIN_VERSION:
+            raise DomainMismatchError("manifest domain name/version does not match AOT-EV1 v1")
+        chain_id = domain["chain_id"]
+        if not isinstance(chain_id, int) or isinstance(chain_id, bool) or not 0 <= chain_id <= MAX_SAFE_INT:
+            raise ManifestError("manifest.domain.chain_id must be a safe non-negative integer")
+        if self.requested_chain_id is not None and self.requested_chain_id != chain_id:
+            raise DomainMismatchError(
+                f"requested chain_id {self.requested_chain_id} does not match manifest domain chain_id {chain_id}"
+            )
+        self.domain = dict(domain)
+        self.effective_chain_id = chain_id
+
     def _entry_content(self, name: str) -> bytes:
         return self._read(name)
 
     # -- step 4 ---------------------------------------------------------
     def _step_bundle_hash(self) -> None:
         entries = [(entry["name"], self._entry_content(entry["name"])) for entry in self.manifest["entries"]]
-        actual = bundle_hash(entries).hex()
+        actual = bundle_hash(entries, legacy=self.legacy).hex()
         if actual != self.manifest["bundle_hash"]:
             raise BundleHashError("bundle_hash does not match the entries")
 
@@ -304,6 +354,15 @@ class _Verifier:
     # -- step 7 ---------------------------------------------------------
     def _step_schema(self) -> None:
         validate_payload(self.payload)
+        payload_domain = self.payload.get("domain")
+        if payload_domain is not None:
+            expected = self.domain or {
+                "name": DOMAIN_NAME,
+                "version": DOMAIN_VERSION,
+                "chain_id": self.effective_chain_id,
+            }
+            if payload_domain != expected:
+                raise DomainMismatchError("payload.domain does not match the manifest domain")
 
     # -- step 8 ---------------------------------------------------------
     def _step_evidence_hash(self) -> None:
@@ -338,7 +397,9 @@ class _Verifier:
         if signature["file"] != expected_file:
             raise error_type(f"{role} signature file must be {expected_file!r}")
         raw = self._entry_content(signature["file"])
-        if not verify_signature(self.payload, role, raw, self.chain_id):
+        if not verify_signature(
+            self.payload, role, raw, self.effective_chain_id, legacy=self.legacy
+        ):
             raise error_type(f"{role} signature is not valid")
         if role == "auditor":
             issuer_identity = self.payload["issuer"]
@@ -353,10 +414,25 @@ class _Verifier:
 
     # -- step 11 --------------------------------------------------------
     def _step_validity(self) -> None:
-        # Revocation is checked first: an explicit revocation wins over expiry.
-        revocation = self.payload["revocation"]
-        if revocation is not None:
-            raise RevokedError(f"evidence revoked at {revocation['revoked_at']}: {revocation['reason']}")
+        # Revocation semantics come first: an explicit status wins over expiry.
+        revocation = self.payload.get("revocation")
+        revoked_at = revocation["revoked_at"] if revocation is not None else None
+        superseded_by = self.payload.get("superseded_by")
+        revoked_by = self.payload.get("revoked_by")
+        if superseded_by is not None and revoked_by is not None:
+            raise RevocationConflictError(
+                "superseded_by and revoked_by are mutually exclusive"
+            )
+        if revoked_by is not None and revoked_at is None:
+            raise RevocationIncompleteError("revoked_by requires revocation.revoked_at")
+        if revoked_at is not None and revoked_by is None:
+            raise RevocationIncompleteError("revocation.revoked_at requires revoked_by")
+        if superseded_by is not None:
+            raise SupersededError(f"evidence superseded by {superseded_by}")
+        if revoked_by is not None:
+            raise RevokedError(
+                f"evidence revoked at {revoked_at} by {revoked_by}: {revocation['reason']}"
+            )
         if self.now < self.payload["valid_from"]:
             raise ExpiredError("evidence is not valid yet (valid_from is in the future)")
         valid_until = self.payload["valid_until"]
@@ -405,15 +481,23 @@ def verify_bytes(
     *,
     now: int | None = None,
     chain_path: str | Path | None = None,
-    chain_id: int = 1,
+    chain_id: int | None = None,
 ) -> VerifyResult:
-    """Verify an in-memory bundle."""
+    """Verify an in-memory bundle.
+
+    ``chain_id`` is an optional assertion: when omitted, the manifest domain
+    is authoritative (legacy bundles fall back to ``1``).
+    """
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("bundle data must be bytes")
     if now is None:
         now = int(time.time())
     if not isinstance(now, int) or isinstance(now, bool) or now < 0:
         raise ValueError("now must be a non-negative integer")
+    if chain_id is not None and (
+        not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id < 0
+    ):
+        raise ValueError("chain_id must be a non-negative integer")
     return _Verifier(bytes(data), now=now, chain_path=chain_path, chain_id=chain_id).run()
 
 
@@ -422,7 +506,7 @@ def verify_bundle(
     *,
     now: int | None = None,
     chain_path: str | Path | None = None,
-    chain_id: int = 1,
+    chain_id: int | None = None,
 ) -> VerifyResult:
     """Verify a bundle file."""
     return verify_bytes(Path(path).read_bytes(), now=now, chain_path=chain_path, chain_id=chain_id)

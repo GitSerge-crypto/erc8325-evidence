@@ -1,0 +1,47 @@
+{
+  "name": "negative_domain_mismatch",
+  "note": "manifest domain chain_id differs from the requested chain_id",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "2525252525252525252525252525252525252525252525252525252525252525",
+    "prev_evidence_hash": null,
+    "revocation": null
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "domain_mismatch",
+  "expect": {
+    "evidence_hash": "e591a1563ada21253dc29db4992ca801fc36451c8b0a5ebf18285b5412d75569",
+    "canonical_bytes_sha256": "94bc7e9a9a6026c3ad2e569f77eb180aab1ed26a23425c58663a5a8449f6523a",
+    "bundle_sha256": null,
+    "verdict": "invalid",
+    "error": "E_DOMAIN_MISMATCH",
+    "exit_code": 2,
+    "chain": "unverified"
+  },
+  "manifest_chain_id": 5
+}

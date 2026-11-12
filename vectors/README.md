@@ -29,6 +29,8 @@ used in production. Positive vectors must reproduce byte-for-byte on
 ```
 
 * `chain` — optional vector file used as the `--chain` predecessor.
+* `manifest_chain_id` — for `domain_mismatch`: the chain_id written into the manifest
+  while the payload was signed for `chain_id`.
 * `mutate` — how the bundle is built. `none` means: canonical payload, sign with
   `keys`, `bundle_bytes(payload, signatures, created_at)`. `raw_invalid` stores
   the payload exactly as `json.dumps(..., separators=(",", ":"), ensure_ascii=True)`
@@ -44,5 +46,8 @@ used in production. Positive vectors must reproduce byte-for-byte on
 Reference runner: `tests/test_vectors.py` (it also regenerates these files with
 `PYTHONPATH=. python tests/test_vectors.py --write`).
 
-Coverage: 4 positive vectors (`ed25519`, `eip712`, `auditor`, `chain`) and 14
-negative vectors covering every rejection case required by the brief (§4).
+Coverage: 4 positive vectors (`ed25519`, `eip712`, `auditor`, `chain`) and 17
+negative vectors, including `domain_mismatch`, `revocation_incomplete` and
+`superseded`. The manifest of every positive vector carries
+`domain.chain_id`; the `bundle_sha256` of all positives changed when the
+domain prefix was added to `bundle_hash`.

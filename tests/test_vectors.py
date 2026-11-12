@@ -244,7 +244,40 @@ CASES: list[dict[str, Any]] = [
         "payload": make_payload(
             "23" * 32,
             revocation={"revoked_at": 1_710_000_000, "reason": "key compromise"},
+            revoked_by="ee" * 32,
         ),
+        "keys": {"issuer": ISSUER_SEED, "auditor": None},
+        "created_at": CREATED_AT,
+        "now": NOW,
+        "mutate": "none",
+    },
+    {
+        "name": "negative_domain_mismatch",
+        "note": "manifest domain chain_id differs from the requested chain_id",
+        "payload": make_payload("25" * 32),
+        "keys": {"issuer": ISSUER_SEED, "auditor": None},
+        "chain_id": 1,
+        "manifest_chain_id": 5,
+        "created_at": CREATED_AT,
+        "now": NOW,
+        "mutate": "domain_mismatch",
+    },
+    {
+        "name": "negative_revocation_incomplete",
+        "note": "revocation.revoked_at without revoked_by",
+        "payload": make_payload(
+            "26" * 32,
+            revocation={"revoked_at": 1_710_000_000, "reason": "key compromise"},
+        ),
+        "keys": {"issuer": ISSUER_SEED, "auditor": None},
+        "created_at": CREATED_AT,
+        "now": NOW,
+        "mutate": "none",
+    },
+    {
+        "name": "negative_superseded",
+        "note": "payload points to a superseding evidence bundle",
+        "payload": make_payload("27" * 32, superseded_by="dd" * 32),
         "keys": {"issuer": ISSUER_SEED, "auditor": None},
         "created_at": CREATED_AT,
         "now": NOW,
@@ -282,11 +315,12 @@ def _assemble(
     entries: dict[str, bytes],
     created_at: int,
     *,
+    chain_id: int = 1,
     manifest_patch=None,
     extra_records: list[tuple[str, bytes]] | None = None,
 ) -> bytes:
     data = sorted(entries.items())
-    manifest = build_manifest(payload, data, created_at)
+    manifest = build_manifest(payload, data, created_at, chain_id)
     if manifest_patch is not None:
         manifest_patch(manifest)
     records = [(MANIFEST_NAME, canonical_bytes(manifest))] + data
@@ -303,7 +337,9 @@ def build_bundle(case: dict[str, Any]) -> bytes:
     mutation = case.get("mutate", "none")
 
     if mutation == "none":
-        return bundle_bytes(payload, _sign_all(payload, keys, chain_id), created_at=created_at)
+        return bundle_bytes(
+            payload, _sign_all(payload, keys, chain_id), created_at=created_at, chain_id=chain_id
+        )
 
     if mutation == "raw_invalid":
         raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("ascii")
@@ -312,6 +348,7 @@ def build_bundle(case: dict[str, Any]) -> bytes:
         manifest = {
             "v": "1",
             "created_at": created_at,
+            "domain": {"name": "AOT-EV1", "version": "1", "chain_id": chain_id},
             "evidence_hash": "00" * 32,
             "payload_sha256": hashlib.sha256(raw).hexdigest(),
             "entries": [
@@ -333,14 +370,14 @@ def build_bundle(case: dict[str, Any]) -> bytes:
 
     if mutation == "small_order":
         entries = {PAYLOAD_NAME: canonical_bytes(payload), "signatures/issuer.ed25519": b"\x00" * 64}
-        return _assemble(payload, entries, created_at)
+        return _assemble(payload, entries, created_at, chain_id=chain_id)
 
     signatures = _sign_all(payload, keys, chain_id)
     entries = _entries(payload, signatures)
 
     if mutation == "tamper_payload":
         data = sorted(entries.items())
-        manifest = build_manifest(payload, data, created_at)
+        manifest = build_manifest(payload, data, created_at, chain_id)
         tampered = bytearray(entries[PAYLOAD_NAME])
         tampered[len(tampered) // 2] ^= 0x01
         records = [(MANIFEST_NAME, canonical_bytes(manifest))]
@@ -350,19 +387,20 @@ def build_bundle(case: dict[str, Any]) -> bytes:
     if mutation == "wrong_key":
         digest = hashlib.sha256(b"AOT-EV1" + canonical_bytes(payload)).digest()
         entries["signatures/issuer.ed25519"] = sign_ed25519(bytes.fromhex(AUDITOR_SEED), "issuer", digest)
-        return _assemble(payload, entries, created_at)
+        return _assemble(payload, entries, created_at, chain_id=chain_id)
 
     if mutation == "sig_s":
         signature = bytearray(signatures["issuer"])
         signature[32:] = L.to_bytes(32, "little")
         entries["signatures/issuer.ed25519"] = bytes(signature)
-        return _assemble(payload, entries, created_at)
+        return _assemble(payload, entries, created_at, chain_id=chain_id)
 
     if mutation == "evidence_hash":
         return _assemble(
             payload,
             entries,
             created_at,
+            chain_id=chain_id,
             manifest_patch=lambda manifest: manifest.update(evidence_hash="00" * 32),
         )
 
@@ -371,18 +409,33 @@ def build_bundle(case: dict[str, Any]) -> bytes:
             payload,
             entries,
             created_at,
+            chain_id=chain_id,
             manifest_patch=lambda manifest: manifest.update(bundle_hash="00" * 32),
+        )
+
+    if mutation == "domain_mismatch":
+        target = case.get("manifest_chain_id")
+        if target is None:
+            raise ValueError("domain_mismatch needs manifest_chain_id")
+        return _assemble(
+            payload,
+            entries,
+            created_at,
+            chain_id=chain_id,
+            manifest_patch=lambda manifest: manifest["domain"].update(chain_id=target),
         )
 
     if mutation == "duplicate_entry":
         data = sorted(entries.items())
-        manifest = build_manifest(payload, data, created_at)
+        manifest = build_manifest(payload, data, created_at, chain_id)
         records = [(MANIFEST_NAME, canonical_bytes(manifest))] + data + [(PAYLOAD_NAME, entries[PAYLOAD_NAME])]
         return _write_zip(records)
 
     if mutation in ("dotdot_entry", "unlisted_entry"):
         name = "../evil.bin" if mutation == "dotdot_entry" else "extra.bin"
-        return _assemble(payload, entries, created_at, extra_records=[(name, b"evil")])
+        return _assemble(
+            payload, entries, created_at, chain_id=chain_id, extra_records=[(name, b"evil")]
+        )
 
     raise ValueError(f"unknown mutation: {mutation!r}")
 
@@ -394,10 +447,12 @@ def _chain_path(case: dict[str, Any], tmp_path: Path) -> Path | None:
     previous_case = json.loads((VECTORS / reference).read_text())
     path = tmp_path / "previous.aotev.zip"
     # The referenced vector is always a positive one, so it is built from keys.
+    previous_chain_id = previous_case.get("chain_id", 1)
     path.write_bytes(bundle_bytes(
         previous_case["payload"],
-        _sign_all(previous_case["payload"], previous_case["keys"], previous_case.get("chain_id", 1)),
+        _sign_all(previous_case["payload"], previous_case["keys"], previous_chain_id),
         created_at=previous_case["created_at"],
+        chain_id=previous_chain_id,
     ))
     return path
 
@@ -444,6 +499,8 @@ def _write_vectors() -> None:
                 "mutate": case.get("mutate", "none"),
                 "expect": expected_for(case, result),
             }
+            if case.get("manifest_chain_id") is not None:
+                vector["manifest_chain_id"] = case["manifest_chain_id"]
             (VECTORS / f"{case['name']}.json").write_text(
                 json.dumps(vector, indent=2, ensure_ascii=False) + "\n"
             )
@@ -493,6 +550,9 @@ def test_all_negative_cases_from_brief_are_covered():
         "negative_expired",
         "negative_revoked",
         "negative_chain_break",
+        "negative_domain_mismatch",
+        "negative_revocation_incomplete",
+        "negative_superseded",
     }
     assert required <= names
     assert len([name for name in names if name.startswith("positive_")]) == 4

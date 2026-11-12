@@ -1,0 +1,47 @@
+{
+  "name": "negative_superseded",
+  "note": "payload points to a superseding evidence bundle",
+  "payload": {
+    "v": "1",
+    "issuer": {
+      "scheme": "ed25519",
+      "key_id": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+      "display": "AOTrust test issuer"
+    },
+    "auditor": null,
+    "subject": {
+      "type": "document",
+      "hash_alg": "sha256",
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "https://example.invalid/doc.pdf"
+    },
+    "claims": {
+      "purpose": "vector",
+      "level": 2
+    },
+    "valid_from": 1700000000,
+    "valid_until": 1800000000,
+    "nonce": "2727272727272727272727272727272727272727272727272727272727272727",
+    "prev_evidence_hash": null,
+    "revocation": null,
+    "superseded_by": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "keys": {
+    "issuer": "1111111111111111111111111111111111111111111111111111111111111111",
+    "auditor": null
+  },
+  "chain_id": 1,
+  "created_at": 1700000000,
+  "now": 1750000000,
+  "chain": null,
+  "mutate": "none",
+  "expect": {
+    "evidence_hash": "613794c7f85e375fa05c839d1e3bbbd7ab5f69194460852db88f94454fbddcf7",
+    "canonical_bytes_sha256": "80a1b8f0b5c2c35fd4abcb79092376308c96ff63134418c30870e7bb0a28b13e",
+    "bundle_sha256": null,
+    "verdict": "superseded",
+    "error": "E_SUPERSEDED",
+    "exit_code": 3,
+    "chain": "unverified"
+  }
+}

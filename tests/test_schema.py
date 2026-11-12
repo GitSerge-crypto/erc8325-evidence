@@ -74,6 +74,44 @@ def test_invalid_payloads_rejected(mutate):
         validate_payload(payload)
 
 
+def test_new_optional_fields_are_accepted():
+    payload = payload_copy(
+        superseded_by="dd" * 32,
+        revoked_by=None,
+        domain={"name": "AOT-EV1", "version": "1", "chain_id": 1},
+    )
+    validate_payload(payload)
+    payload = payload_copy()
+    validate_payload(payload)  # v0.1 payloads without the new fields stay valid
+
+
+def test_legacy_payload_without_domain_is_still_valid():
+    payload = valid_payload()
+    assert "domain" not in payload
+    assert "superseded_by" not in payload
+    validate_payload(payload)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda p: p.update(superseded_by="zz" * 32),
+        lambda p: p.update(revoked_by="dd" * 31),
+        lambda p: p.update(domain={"name": "AOT-EV1", "version": "1"}),
+        lambda p: p.update(domain={"name": "Other", "version": "1", "chain_id": 1}),
+        lambda p: p.update(domain={"name": "AOT-EV1", "version": "2", "chain_id": 1}),
+        lambda p: p.update(domain={"name": "AOT-EV1", "version": "1", "chain_id": -1}),
+        lambda p: p.update(domain={"name": "AOT-EV1", "version": "1", "chain_id": "1"}),
+        lambda p: p.update(domain={"name": "AOT-EV1", "version": "1", "chain_id": 1, "x": 2}),
+    ],
+)
+def test_invalid_new_fields_are_rejected(mutate):
+    payload = valid_payload()
+    mutate(payload)
+    with pytest.raises(SchemaError):
+        validate_payload(payload)
+
+
 def test_schema_error_reports_path():
     payload = payload_copy()
     payload["subject"]["hash"] = "oops"
